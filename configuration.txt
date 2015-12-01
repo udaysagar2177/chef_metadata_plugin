@@ -1,0 +1,17 @@
+# List the node attributes here so that they can be attached as
+# metadata to your chef data on Signalfx.
+#
+# Be sure to list the exact attribute name
+# For example: Add tags below to add tags on your nodes as metadata
+# 
+# If you want to add subattribute as metadata, separate each token in 
+# subattribute chain by a '.'.
+# For example: To add version of the python under languages attribute 
+# as metadata, 
+# Add languages.python.version below
+#
+# For more attributes, Check attributes section on Chef Server web UI
+
+roles
+tags
+languages.python.version
