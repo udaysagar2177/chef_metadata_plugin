@@ -18,7 +18,7 @@ class Metadata(object):
 	LOG_FILE = '/var/log/ChefMetadata.log'
 	URL = 'http://lab-api.corp.signalfuse.com:8080/v1/dimension'
 	PICKLE_FILE = 'pk_metadata.pk'
-	SLEEP_DURATION = 60 			# IN SECONDS
+	SLEEP_DURATION = 60			# IN SECONDS
 	propertyNamePattern = re.compile('^[a-zA-Z_][a-zA-Z0-9_-]*$')
 	config = []
 	organization = ''
@@ -38,6 +38,12 @@ class Metadata(object):
 		self.ACCESS_TOKEN = ACCESS_TOKEN
 
 	def run(self):
+		"""
+		Read the configuration file
+		Collect metadata from Chef Server API
+		Send metadata to Signalfx
+		Save the metadata for future comparisions 
+		"""
 		self.nodes_metadata = []
 		self.readConfig()
 		self.collectMetadataFromChef()
@@ -46,6 +52,9 @@ class Metadata(object):
 		self.saveMetadata()
 
 	def saveMetadata(self):
+		"""
+		Save the metadata as Python pickle
+		"""
 		pickleData = {}
 		for nodeInformation in self.nodes_metadata:
 			pickleData[nodeInformation['chefUniqueId']] = nodeInformation
@@ -56,13 +65,18 @@ class Metadata(object):
 		output.close()
 
 	def sendMetadataToSignalfx(self, nodeInformation):
+		"""
+		Get ObjectID for the chefUniqueId dimension from Signalfx
+		Check for changes between newly collected metadata and last run's data
+		If there are any updates, send those changes to Signalfx
+		"""
 		headers = {
 			'X-SF-Token':self.ACCESS_TOKEN,
 		}
 		resp = self.getSignalfxObjectId(nodeInformation, headers)
 		if len(resp.json()['rs']) == 0:
-			self.logger.info('Signalfx does not have your dimension'
-				+'object chefUniqueId:'+nodeInformation['chefUniqueId'])
+			self.logger.info('Signalfx does not have an object '
+				+'for your dimension chefUniqueId:'+nodeInformation['chefUniqueId'])
 			return
 		signalfxObjectId = resp.json()['rs'][0]
 		self.logger.info("ObjectID for "+nodeInformation['chefUniqueId']
@@ -75,6 +89,12 @@ class Metadata(object):
 			self.logger.info('No new metadata is found for '+nodeInformation['chefUniqueId'])
 
 	def checkForUpdatesInMetadata(self, current_data):
+		"""
+		Read the data saved in the last run
+		Compare it with the current metadata and pop unchanged items
+
+		return: updated metadata
+		"""
 		inputPickle = open(self.PICKLE_FILE, 'rb')
 		self.logger.info('Reading previous metadata from '+self.PICKLE_FILE)
 		savedMetadata = pickle.load(inputPickle)
@@ -89,6 +109,11 @@ class Metadata(object):
 		return current_data
 
 	def getSignalfxObjectId(self, nodeInformation, headers):
+		"""
+		Get ObjectID for the chefUniqueId dimension from Signalfx
+
+		return: the api response
+		"""
 		params = {
 			'query':'chefUniqueId:'+nodeInformation['chefUniqueId'],
 			'getIDs':'true'
@@ -102,6 +127,9 @@ class Metadata(object):
 		return resp
 		
 	def readConfig(self):
+		"""
+		Read the configuration file
+		"""
 		self.config = []
 		with open(self.CONFIG_FILE, 'r') as f:
 			lines = f.readlines()
@@ -113,6 +141,12 @@ class Metadata(object):
 						self.config.append(attribute)
 
 	def checkPropertyNameSyntax(self, attribute):
+		"""
+		Check if the attribute name from the configuration file
+		follows the pattern expected by Signalfx
+
+		return: True or False
+		"""
 		if not self.propertyNamePattern.match(attribute):
 			self.logger.error('Invalid attribute name '
 				+ attribute
@@ -122,10 +156,16 @@ class Metadata(object):
 		return True
 
 	def exitNow(self):
+		"""
+		Exit from the program with a message on the console
+		"""
 		print("Error logged into the log file! Exiting...");
 		sys.exit(1)
 
 	def apiGetRequest(self, endpoint):
+		"""
+		Execute the Chef Server api's GET request for given endpoint
+		"""
 		value = None
 		try:
 			value = self.api.api_request('GET', endpoint)
@@ -136,6 +176,10 @@ class Metadata(object):
 		return value
 
 	def collectMetadataFromChef(self):
+		"""
+		Get the current organization name and its nodes
+		Get the metadata for each node
+		"""
 		organization_details =  self.apiGetRequest('')
 		self.organization = organization_details['name']
 		nodes = self.apiGetRequest('/nodes')
@@ -143,6 +187,10 @@ class Metadata(object):
 			self.getNodeInformation(node_name)
 
 	def getNodeInformation(self, node_name):
+		"""
+		Get node attributes(metadata) using Node.attributes of PyChef
+		Collect the values of the configs selected by the user for each node
+		"""
 		chefUniqueId = self.organization+"_"+node_name
 		node_details = Node(node_name)
 		nodeInformation = {}
@@ -157,12 +205,19 @@ class Metadata(object):
 		self.nodes_metadata.append(nodeInformation)
 
 	def adjustAttributeName(self, attribute):
+		"""
+		Replace '.' by '_' in the attributes listed in the configuration file
+		and return it
+		"""
 		attribute = attribute.replace('.', '_')
 		if not attribute.startswith('chef_'):
 			attribute = 'chef_' + attribute
 		return attribute
 
 	def getAttributeValue(self, attribute, node_details):
+		"""
+		Return the value of the given attribute
+		"""
 		tokens = attribute.split('.')
 		tempValue = node_details
 		for token in tokens:
@@ -181,6 +236,10 @@ class Metadata(object):
 
 
 def main(argv):
+	"""
+	If a valid access token is given, execute Metadata.run() and
+	sleep for Metadata.SLEEP_DURATION in a loop
+	"""
 	FILE_NAME = sys.argv[0]
 	try:
 		opts, argv = getopt.getopt(argv, "ht:", ["accessToken="])
