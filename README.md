@@ -1,5 +1,7 @@
 # chef_metadata_plugin
 
+#### Development on this project has been moved to [collect-chef-metadata](https://github.com/signalfx/collect-chef-metadata)
+
 This python program queries Chef Server API to get the metadata about the nodes in the Chef cluster and forwards the configured values to the Signalfx through its REST API. The metadata includes chef environment and other attributes listed on your Chef server web UI.
 
 When you install the Chef cookbook provided by Signalfx to send metrics, a custom dimension called 'ChefUniqueId' is created and sent from each of your nodes. The format of the custom dimension is <*your-organization-name*>_<*node-name*>
